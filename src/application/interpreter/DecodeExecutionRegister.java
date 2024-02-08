@@ -6,6 +6,7 @@ public class DecodeExecutionRegister extends PipelineRegister{
 	private Register destRegister;
 	private int value1;
 	private int value2;
+	private String destJump;
 	
 	public InstructionType getInstructionType() {
 		return instructionType;
@@ -37,5 +38,13 @@ public class DecodeExecutionRegister extends PipelineRegister{
 	
 	public void setValue2(int value2) {
 		this.value2 = value2;
+	}
+	
+	public String getDestJump() {
+		return destJump;
+	}
+	
+	public void setDestJump(String destJump) {
+		this.destJump = destJump;
 	}
 }

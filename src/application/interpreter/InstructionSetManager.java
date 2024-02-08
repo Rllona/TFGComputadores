@@ -1,5 +1,7 @@
 package application.interpreter;
 
+import java.util.HashMap;
+
 public class InstructionSetManager{
 	
 	MIPSInterpreter interpreter;
@@ -31,6 +33,10 @@ public class InstructionSetManager{
 		return index;
 	}
 	
+	public void resetPipelineRegister() {
+		interpreter.fdregister.setInstructionIndex(-1);
+	}
+	
 	
 	//Identificación Tipos de Instrucción
 	
@@ -59,5 +65,11 @@ public class InstructionSetManager{
 	
 	public int sub(int value1, int value2) {
 		return value1 - value2;
+	}
+	
+	public void jump(String label) {
+		HashMap<String, Integer> labels = interpreter.getLabels();
+		interpreter.pc = labels.get(label);
+		resetPipelineRegister();
 	}
 }

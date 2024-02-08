@@ -1,20 +1,28 @@
 package application.interpreter;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+
+import application.userinterface.*;
 
 public class MIPSInterpreter {
 	
+	private MainController controller;
 	private InstructionSetManager IM;
 	protected List<Register> registers;
 	protected int pc;
 	private int cycles;
-	private FetchDecodeRegister fdregister;
-	private DecodeExecutionRegister deregister;
-	private ExecutionMemoryRegister emregister;
-	private MemoryWriteBackRegister mwregister;
+	protected FetchDecodeRegister fdregister;
+	protected DecodeExecutionRegister deregister;
+	protected ExecutionMemoryRegister emregister;
+	protected MemoryWriteBackRegister mwregister;
+	private int lastInstructionCompleted;
 	
-	public MIPSInterpreter() {
+	private HashMap<String, Integer> labels;
+	
+	public MIPSInterpreter(MainController controller) {
+		this.controller = controller;
 		IM = new InstructionSetManager(this);
 		registers = new ArrayList<Register>();
         pc = 0;
@@ -23,8 +31,14 @@ public class MIPSInterpreter {
         deregister = new DecodeExecutionRegister();
         emregister = new ExecutionMemoryRegister();
         mwregister = new MemoryWriteBackRegister();
+        lastInstructionCompleted = -1;
+        labels = new HashMap<String, Integer>();
         initializeRegisters();
     }
+	
+	public int getCycles() {
+		return cycles;
+	}
 	
 	public List<Register> getRegisters(){
 		return registers;
@@ -37,10 +51,16 @@ public class MIPSInterpreter {
         }
 	}
 	
+	public HashMap<String, Integer> getLabels(){
+		return labels;
+	}
+	
 	private void executeCode(String[] instructions) {
-        while (pc < instructions.length || mwregister.getInstructionIndex() != -1) {
+		//controller.addFirstDiagramColumn();
+        while (codeNotEnded(instructions.length)) {
 
             //Etapa WriteBack
+        	lastInstructionCompleted = mwregister.getInstructionIndex();
             if(mwregister.getInstructionIndex() != -1) {
             	writeBack();
             }
@@ -68,15 +88,21 @@ public class MIPSInterpreter {
             	fdregister.setInstructionIndex(pc);
                 String instruction = instructions[pc];
                 fetchInstruction(instruction);
+                controller.addDiagramRow(pc-2, instruction);
                 pc++;
             }else {
             	fdregister.setInstructionIndex(-1);
             }
             
             cycles++;
+            controller.addDiagramColumn(cycles, fdregister.getInstructionIndex(), deregister.getInstructionIndex(), emregister.getInstructionIndex(), mwregister.getInstructionIndex(), lastInstructionCompleted);
         }
         System.out.println("Número de ciclos ejecutados: " + cycles);
     }
+	
+	private boolean codeNotEnded(int nInstructions) {
+		return (pc < nInstructions || mwregister.getInstructionIndex() != -1 || emregister.getInstructionIndex() != -1 || deregister.getInstructionIndex() != -1 || fdregister.getInstructionIndex() != -1);
+	}
 	
 	private void fetchInstruction(String instruction) {
 		String[] parts = instruction.split("\\s+");
@@ -115,7 +141,7 @@ public class MIPSInterpreter {
 			
 		}else if(IM.isTypeJump(opcode)) {
 			instructionType = InstructionType.typeJump;
-			
+			deregister.setDestJump(parts[1]);
 		}
 		
 		deregister.setInstructionType(instructionType);
@@ -146,7 +172,7 @@ public class MIPSInterpreter {
 			break;
 			
 		case typeJump:
-			
+			IM.jump(deregister.getDestJump());
 			break;
 			
 		case unknown:
@@ -180,12 +206,45 @@ public class MIPSInterpreter {
 
 	public void Run(String code) {
 		//MIPSInterpreter interpreter = new MIPSInterpreter();
-		String[] instructions = code.split("\n");
+		String[] instructions = instructionsParser(code);
 		
 		for (int i = 0; i < instructions.length; i++) {
 			System.out.println(instructions[i]);
 		}
 		
 		executeCode(instructions);
+	}
+	
+	private String[] instructionsParser(String code) {
+		String[] lines = code.split("\n");
+		int numIns = 0;
+		
+		for (int i = 0; i < lines.length; i++) {
+			lines[i] = lines[i].trim();
+			if(lines[i].contains(";")) {
+				int semiColonIndex = lines[i].indexOf(";");
+				lines[i] = lines[i].substring(0, semiColonIndex);
+			}
+			if(lines[i] != null && lines[i] != "" && lines[i] != " " && lines[i] != "\n") {
+				numIns++;
+			}
+		}
+		
+		String[] instructions = new String[numIns];
+		
+		int index = 0;
+		for (int i = 0; i < lines.length; i++) {
+			if(lines[i] != null && lines[i] != "" && lines[i] != " " && lines[i] != "\n") {
+				if(lines[i].contains(":")) {
+					int colonIndex = lines[i].indexOf(":");
+					labels.put(lines[i].substring(0, colonIndex).trim(), index);
+					lines[i] = lines[i].substring(colonIndex + 1);
+				}
+				instructions[index] = lines[i].trim();
+				index++;
+			}
+		}
+		
+		return instructions;
 	}
 }

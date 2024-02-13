@@ -11,6 +11,7 @@ public class MIPSInterpreter {
 	private MainController controller;
 	private InstructionSetManager IM;
 	protected List<Register> registers;
+	protected int[] memory = new int[1024];
 	protected int pc;
 	private int cycles;
 	protected FetchDecodeRegister fdregister;
@@ -44,15 +45,15 @@ public class MIPSInterpreter {
 		return registers;
 	}
 	
+	public HashMap<String, Integer> getLabels(){
+		return labels;
+	}
+	
 	private void initializeRegisters() {
 		for (int i = 0; i < 32; i++) {
 			Register r = new Register("R" + i, 0);
             registers.add(r);
         }
-	}
-	
-	public HashMap<String, Integer> getLabels(){
-		return labels;
 	}
 	
 	private void executeCode(String[] instructions) {
@@ -138,6 +139,7 @@ public class MIPSInterpreter {
 			
 		}else if(IM.isTypeBranch(opcode)) {
 			instructionType = InstructionType.typeBranch;
+			deregister.setDestJump(parts[3]);
 			
 		}else if(IM.isTypeJump(opcode)) {
 			instructionType = InstructionType.typeJump;
@@ -168,7 +170,11 @@ public class MIPSInterpreter {
 			break;
 		
 		case typeBranch:
-			
+			if ("beq".equals(opcode)){
+				IM.beq(deregister.getValue1(), deregister.getValue2(), deregister.getDestJump());
+			}else if ("bne".equals(opcode)){
+				IM.bne(deregister.getValue1(), deregister.getValue2(), deregister.getDestJump());
+			}
 			break;
 			
 		case typeJump:

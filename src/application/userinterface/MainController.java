@@ -73,11 +73,16 @@ public class MainController {
 		grid.setMinHeight(BOX_HEIGHT * nInstruction);
 		grid.setPrefHeight(BOX_HEIGHT * nInstruction);
 		grid.setMaxHeight(BOX_HEIGHT * nInstruction);
+		fixedColumn.setMinHeight(BOX_HEIGHT * nInstruction);
+		fixedColumn.setPrefHeight(BOX_HEIGHT * nInstruction);
+		fixedColumn.setMaxHeight(BOX_HEIGHT * nInstruction);
 		addBox(0, nInstruction, instruction, "aliceblue", true);
 	}
 	
 	public void addDiagramColumn(int nCycles, int instructionF, int instructionD, int instructionE, int instructionM, int instructionW) {
 		grid.setMinWidth(BOX_WIDTH * nCycles);
+		grid.setPrefWidth(BOX_WIDTH * nCycles);
+		grid.setMaxWidth(BOX_WIDTH * nCycles);
 		if(instructionF != -1) {
 			addBox(nCycles, instructionF, "IF", "gold", false);
 		}
@@ -119,6 +124,15 @@ public class MainController {
 	
 	public void clearDiagram() {
 		grid.getChildren().clear();
+		grid.setMinHeight(0);
+		grid.setPrefHeight(0);
+		grid.setMaxHeight(0);
+		grid.setMinWidth(0);
+		grid.setPrefWidth(0);
+		grid.setMaxWidth(0);
 		fixedColumn.getChildren().clear();
+		fixedColumn.setMinHeight(0);
+		fixedColumn.setPrefHeight(0);
+		fixedColumn.setMaxHeight(0);
 	}
 }

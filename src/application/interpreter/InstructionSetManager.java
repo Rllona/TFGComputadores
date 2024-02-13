@@ -72,4 +72,16 @@ public class InstructionSetManager{
 		interpreter.pc = labels.get(label);
 		resetPipelineRegister();
 	}
+	
+	public void beq(int value1, int value2, String label) {
+		if(value1 == value2) {
+			jump(label);
+		}
+	}
+	
+	public void bne(int value1, int value2, String label) {
+		if(value1 != value2) {
+			jump(label);
+		}
+	}
 }

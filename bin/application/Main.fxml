@@ -12,14 +12,14 @@
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.VBox?>
 
-<AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="1080.0" prefWidth="1920.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.userinterface.MainController">
+<AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="1050.0" prefWidth="1920.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.userinterface.MainController">
    <children>
       <Button layoutX="37.0" layoutY="39.0" mnemonicParsing="false" onAction="#onExecuteButtonDown" text="Ejecutar" />
-      <TextArea fx:id="inputCodeArea" layoutX="37.0" layoutY="76.0" prefHeight="469.0" prefWidth="1000.0" />
-      <TableView fx:id="registersTable" layoutX="1179.0" layoutY="76.0" prefHeight="469.0" prefWidth="360.0">
+      <TextArea fx:id="inputCodeArea" layoutX="37.0" layoutY="76.0" prefHeight="470.0" prefWidth="1000.0" />
+      <TableView fx:id="registersTable" layoutX="1125.0" layoutY="76.0" prefHeight="470.0" prefWidth="360.0">
         <columns>
-          <TableColumn fx:id="registersIdCol" prefWidth="140.0" text="Registros" />
-          <TableColumn fx:id="registersValueCol" prefWidth="220.0" text="Valor" />
+          <TableColumn fx:id="registersIdCol" editable="false" prefWidth="140.0" sortable="false" text="Registros" />
+          <TableColumn fx:id="registersValueCol" editable="false" prefWidth="220.0" sortable="false" text="Valor" />
         </columns>
          <columnResizePolicy>
             <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
@@ -44,13 +44,13 @@
           </Menu>
         </menus>
       </MenuBar>
-      <ScrollPane fx:id="scrollPane" hbarPolicy="ALWAYS" layoutX="177.0" layoutY="560.0" prefHeight="438.0" prefWidth="1278.0" vbarPolicy="ALWAYS">
+      <ScrollPane fx:id="scrollPane" hbarPolicy="ALWAYS" layoutX="177.0" layoutY="560.0" prefHeight="468.0" prefWidth="1278.0" vbarPolicy="ALWAYS">
          <content>
             <GridPane fx:id="grid" gridLinesVisible="true" minHeight="30.0" minWidth="70.0" prefHeight="30.0" prefWidth="70.0">
             </GridPane>
          </content>
       </ScrollPane>
-      <ScrollPane fx:id="fixedScrollPane" hbarPolicy="NEVER" layoutX="37.0" layoutY="560.0" prefHeight="420.0" prefWidth="140.0" vbarPolicy="NEVER">
+      <ScrollPane fx:id="fixedScrollPane" hbarPolicy="NEVER" layoutX="37.0" layoutY="560.0" prefHeight="450.0" prefWidth="140.0" vbarPolicy="NEVER">
          <content>
             <VBox fx:id="fixedColumn" prefHeight="30.0" prefWidth="140.0" />
          </content>

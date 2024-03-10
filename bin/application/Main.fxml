@@ -4,18 +4,25 @@
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.RadioMenuItem?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.ToggleGroup?>
 <?import javafx.scene.layout.AnchorPane?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
 
 <AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="1050.0" prefWidth="1920.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="application.userinterface.MainController">
    <children>
       <Button layoutX="37.0" layoutY="39.0" mnemonicParsing="false" onAction="#onExecuteButtonDown" text="Ejecutar" />
-      <TextArea fx:id="inputCodeArea" layoutX="37.0" layoutY="76.0" prefHeight="470.0" prefWidth="1000.0" />
+      <Button layoutX="121.0" layoutY="39.0" mnemonicParsing="false" onAction="#onNextCycleButtonDown" text="Siguiente Ciclo" />
+      <TextArea fx:id="inputCodeArea" layoutX="37.0" layoutY="76.0" prefHeight="470.0" prefWidth="1000.0">
+         <font>
+            <Font name="Consolas" size="15.0" />
+         </font></TextArea>
       <TableView fx:id="registersTable" layoutX="1125.0" layoutY="76.0" prefHeight="470.0" prefWidth="360.0">
         <columns>
           <TableColumn fx:id="registersIdCol" editable="false" prefWidth="140.0" sortable="false" text="Registros" />
@@ -32,10 +39,20 @@
               <MenuItem mnemonicParsing="false" text="Close" />
             </items>
           </Menu>
-          <Menu mnemonicParsing="false" text="Edit">
-            <items>
-              <MenuItem mnemonicParsing="false" text="Delete" />
-            </items>
+          <Menu mnemonicParsing="false" text="Configuración">
+               <items>
+                  <Menu mnemonicParsing="false" text="Predicción de Salto">
+                    <items>
+                        <RadioMenuItem fx:id="branchPredictorDisable" mnemonicParsing="false" selected="true" text="Desactivado">
+                           <toggleGroup>
+                              <ToggleGroup fx:id="BranchPrediction" />
+                           </toggleGroup>
+                        </RadioMenuItem>
+                        <RadioMenuItem fx:id="branchPredictor1bit" mnemonicParsing="false" text="Estados de 1 bit" toggleGroup="$BranchPrediction" />
+                        <RadioMenuItem fx:id="branchPredictor2bit" mnemonicParsing="false" text="Estados de 2 bit" toggleGroup="$BranchPrediction" />
+                    </items>
+                  </Menu>
+               </items>
           </Menu>
           <Menu mnemonicParsing="false" text="Help">
             <items>
@@ -46,7 +63,7 @@
       </MenuBar>
       <ScrollPane fx:id="scrollPane" hbarPolicy="ALWAYS" layoutX="177.0" layoutY="560.0" prefHeight="468.0" prefWidth="1278.0" vbarPolicy="ALWAYS">
          <content>
-            <GridPane fx:id="grid" gridLinesVisible="true" minHeight="30.0" minWidth="70.0" prefHeight="30.0" prefWidth="70.0">
+            <GridPane fx:id="grid" minHeight="30.0" minWidth="70.0" prefHeight="30.0" prefWidth="70.0">
             </GridPane>
          </content>
       </ScrollPane>

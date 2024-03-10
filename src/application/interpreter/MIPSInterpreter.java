@@ -10,9 +10,11 @@ public class MIPSInterpreter {
 	
 	private MainController controller;
 	private InstructionSetManager IM;
+	private String[] instructions;
 	protected List<Register> registers;
-	protected int[] memory = new int[1024];
+	//private HashMap<String, Integer> memoryVariables;
 	protected int pc;
+	protected int totalInsCounter;
 	private int cycles;
 	protected FetchDecodeRegister fdregister;
 	protected DecodeExecutionRegister deregister;
@@ -21,12 +23,20 @@ public class MIPSInterpreter {
 	private int lastInstructionCompleted;
 	
 	private HashMap<String, Integer> labels;
+	protected int branchPredictor; // 0 -> Desactivado / 1 -> Predicción de salto de 1 bit / 2 -> Predicción de salto de 2 bit
+	protected HashMap<Integer, BranchTargetBuffer> branchBuffer;
+	private boolean lastBranchTaken;
+	
+	private boolean stallCycle;
 	
 	public MIPSInterpreter(MainController controller) {
 		this.controller = controller;
 		IM = new InstructionSetManager(this);
+		instructions = new String[0];
 		registers = new ArrayList<Register>();
+		//memoryVariables = new HashMap<String, Integer>();
         pc = 0;
+        totalInsCounter = 0;
         cycles = 0;
         fdregister = new FetchDecodeRegister();
         deregister = new DecodeExecutionRegister();
@@ -34,6 +44,10 @@ public class MIPSInterpreter {
         mwregister = new MemoryWriteBackRegister();
         lastInstructionCompleted = -1;
         labels = new HashMap<String, Integer>();
+        branchPredictor = controller.getBranchPredictionConfig();
+        branchBuffer = new HashMap<Integer, BranchTargetBuffer>();
+        lastBranchTaken = false;
+        stallCycle = false;
         initializeRegisters();
     }
 	
@@ -56,50 +70,86 @@ public class MIPSInterpreter {
         }
 	}
 	
-	private void executeCode(String[] instructions) {
-		//controller.addFirstDiagramColumn();
-        while (codeNotEnded(instructions.length)) {
+	public void runCompleteCode() {
+		for (int i = 0; i < instructions.length; i++) {
+			System.out.println(instructions[i]);
+		}
 
-            //Etapa WriteBack
-        	lastInstructionCompleted = mwregister.getInstructionIndex();
-            if(mwregister.getInstructionIndex() != -1) {
-            	writeBack();
-            }
-            
-            //Etapa Memory
-            mwregister.setInstructionIndex(emregister.getInstructionIndex());
-            if(emregister.getInstructionIndex() != -1) {
-	            memory();
-            }
-            
-            //Etapa Execute
-            emregister.setInstructionIndex(deregister.getInstructionIndex());
-            if(deregister.getInstructionIndex() != -1) {
-	            execute();
-            }
-            
-            //Etapa Decode
-            deregister.setInstructionIndex(fdregister.getInstructionIndex());
-            if(fdregister.getInstructionIndex() != -1) {
+		while (codeNotEnded(instructions.length)) {
+			executeCycle(instructions);
+		}
+        System.out.println("Número de ciclos ejecutados: " + cycles);	
+	}
+	
+	public void runCycle() {
+		if (codeNotEnded(instructions.length)) {
+			executeCycle(instructions);
+		}else {
+			System.out.println("Número de ciclos ejecutados: " + cycles);
+			controller.isFirstCycle = true;
+		}
+	}
+	
+	private void executeCycle(String[] instructions) {
+		//Etapa WriteBack
+    	lastInstructionCompleted = mwregister.getTotalInsIndex();
+        if(mwregister.getInstructionIndex() != -1) {
+        	writeBack();
+        }
+        
+        //Etapa Memory
+        mwregister.setInstructionIndex(emregister.getInstructionIndex());
+        mwregister.setTotalInsIndex(emregister.getTotalInsIndex());
+        if(emregister.getInstructionIndex() != -1) {
+            memory();
+        }
+        
+        //Etapa Execute
+        emregister.setInstructionIndex(deregister.getInstructionIndex());
+        emregister.setTotalInsIndex(deregister.getTotalInsIndex());
+        if(deregister.getInstructionIndex() != -1) {
+            execute();
+        }
+        
+        //Etapa Decode 	
+        //Check for data hazards
+        if(fdregister.getInstructionIndex() != -1) {
+        	decode();
+        	stallCycle = dataHazard();
+        }
+        
+        if(!stallCycle) {
+        	deregister.setInstructionIndex(fdregister.getInstructionIndex());
+            deregister.setTotalInsIndex(fdregister.getTotalInsIndex());
+            /*if(fdregister.getInstructionIndex() != -1) {
 	            decode();
-            }
-            
-            //Etapa Fetch
+            }*/
+        }else {
+        	deregister.setInstructionIndex(-1);
+            deregister.setTotalInsIndex(-1);
+        }
+        
+        //Etapa Fetch
+        if(!stallCycle) {
             if(pc < instructions.length) {
             	fdregister.setInstructionIndex(pc);
+            	fdregister.setTotalInsIndex(totalInsCounter);
                 String instruction = instructions[pc];
                 fetchInstruction(instruction);
-                controller.addDiagramRow(pc-2, instruction);
-                pc++;
+                if(!lastBranchTaken) {
+                	pc++;
+                }
+                lastBranchTaken = false;
+                totalInsCounter++;
+                controller.addDiagramRow(totalInsCounter, instruction);
             }else {
             	fdregister.setInstructionIndex(-1);
+            	fdregister.setTotalInsIndex(-1);
             }
-            
-            cycles++;
-            controller.addDiagramColumn(cycles, fdregister.getInstructionIndex(), deregister.getInstructionIndex(), emregister.getInstructionIndex(), mwregister.getInstructionIndex(), lastInstructionCompleted);
         }
-        System.out.println("Número de ciclos ejecutados: " + cycles);
-    }
+        cycles++;
+        controller.addDiagramColumn(cycles, fdregister.getTotalInsIndex(), deregister.getTotalInsIndex(), emregister.getTotalInsIndex(), mwregister.getTotalInsIndex(), lastInstructionCompleted, stallCycle);
+	}
 	
 	private boolean codeNotEnded(int nInstructions) {
 		return (pc < nInstructions || mwregister.getInstructionIndex() != -1 || emregister.getInstructionIndex() != -1 || deregister.getInstructionIndex() != -1 || fdregister.getInstructionIndex() != -1);
@@ -111,6 +161,25 @@ public class MIPSInterpreter {
 		
 		fdregister.setOpcode(opcode);
 		fdregister.setParts(parts);
+		
+		//Brach prediction
+		if (branchPredictor == 1 || branchPredictor == 2) {
+			if (branchBuffer.containsKey(pc)) {
+				BranchTargetBuffer buffer = branchBuffer.get(pc);
+				
+				if (branchPredictor == 1) {
+					if(buffer.getPredictionState().equals("1")) {
+						pc = buffer.getTargetAddress();
+						lastBranchTaken = true;
+					}
+				}else if (branchPredictor == 2) {
+					if (buffer.getPredictionState().equals("11") || buffer.getPredictionState().equals("10")) {
+						pc = buffer.getTargetAddress();
+						lastBranchTaken = true;
+					}
+				}
+			}
+		}
     }
 	
 	private void decode() {
@@ -139,6 +208,8 @@ public class MIPSInterpreter {
 			
 		}else if(IM.isTypeBranch(opcode)) {
 			instructionType = InstructionType.typeBranch;
+			deregister.setValue1(IM.getRegisterValue(parts[1]));
+			deregister.setValue2(IM.getRegisterValue(parts[2]));
 			deregister.setDestJump(parts[3]);
 			
 		}else if(IM.isTypeJump(opcode)) {
@@ -156,6 +227,9 @@ public class MIPSInterpreter {
 		emregister.setOpcode(opcode);
 		emregister.setDestRegister(deregister.getDestRegister());
 		
+		int instructionIndex = deregister.getInstructionIndex();
+		boolean branchTaken;
+		
 		switch (instructionType) {
 		case typeR:
 			if ("add".equals(opcode) || "addi".equals(opcode)) {
@@ -170,15 +244,23 @@ public class MIPSInterpreter {
 			break;
 		
 		case typeBranch:
+			branchTaken = false;
 			if ("beq".equals(opcode)){
-				IM.beq(deregister.getValue1(), deregister.getValue2(), deregister.getDestJump());
+				branchTaken = IM.beq(deregister.getValue1(), deregister.getValue2(), deregister.getDestJump());
+				
 			}else if ("bne".equals(opcode)){
-				IM.bne(deregister.getValue1(), deregister.getValue2(), deregister.getDestJump());
+				branchTaken = IM.bne(deregister.getValue1(), deregister.getValue2(), deregister.getDestJump());
 			}
+			
+			//To do si se predice que se salta y se falla
+			branchPrediction(branchTaken, instructionIndex);
 			break;
 			
 		case typeJump:
+			branchTaken = true;
 			IM.jump(deregister.getDestJump());
+			
+			branchPrediction(branchTaken, instructionIndex);
 			break;
 			
 		case unknown:
@@ -209,48 +291,141 @@ public class MIPSInterpreter {
 		
 		IM.setRegister(destRegister, destValue);
 	}
-
-	public void Run(String code) {
-		//MIPSInterpreter interpreter = new MIPSInterpreter();
-		String[] instructions = instructionsParser(code);
-		
-		for (int i = 0; i < instructions.length; i++) {
-			System.out.println(instructions[i]);
-		}
-		
-		executeCode(instructions);
-	}
 	
-	private String[] instructionsParser(String code) {
+	public void instructionsParser(String code) {
 		String[] lines = code.split("\n");
 		int numIns = 0;
+		boolean inDataSection = false;
+		boolean inTextSection = false;
+		int indexTextSectionStart = -1;
 		
 		for (int i = 0; i < lines.length; i++) {
 			lines[i] = lines[i].trim();
+			
+			//Eliminar Comentarios
 			if(lines[i].contains(";")) {
 				int semiColonIndex = lines[i].indexOf(";");
 				lines[i] = lines[i].substring(0, semiColonIndex);
 			}
-			if(lines[i] != null && lines[i] != "" && lines[i] != " " && lines[i] != "\n") {
+			
+			//Parsear sección .data
+			if(inDataSection && lines[i] != null && lines[i] != "" && lines[i] != " " && lines[i] != "\n") {
+				if(lines[i].contains(":")) {
+					int colonIndex = lines[i].indexOf(":");
+					//memoryVariables.put(lines[i].substring(0, colonIndex).trim(), index);
+					lines[i] = lines[i].substring(colonIndex + 1);
+				}
+			}
+			//Parsear sección .text
+			else if(inTextSection && lines[i] != null && lines[i] != "" && lines[i] != " " && lines[i] != "\n") {
 				numIns++;
+			}
+			
+			if(lines[i].equals(".data")) {
+				inDataSection = true;
+				inTextSection = false;
+			}
+			else if(lines[i].equals(".text")) {
+				inDataSection = false;
+				inTextSection = true;
+				indexTextSectionStart = i + 1;
 			}
 		}
 		
-		String[] instructions = new String[numIns];
+		instructions = new String[numIns];
 		
 		int index = 0;
-		for (int i = 0; i < lines.length; i++) {
+		for (int i = indexTextSectionStart; i < lines.length; i++) {
 			if(lines[i] != null && lines[i] != "" && lines[i] != " " && lines[i] != "\n") {
 				if(lines[i].contains(":")) {
 					int colonIndex = lines[i].indexOf(":");
 					labels.put(lines[i].substring(0, colonIndex).trim(), index);
 					lines[i] = lines[i].substring(colonIndex + 1);
 				}
+				lines[i] = lines[i].replace(',', ' ');
 				instructions[index] = lines[i].trim();
 				index++;
 			}
 		}
-		
-		return instructions;
+	}
+	
+	private boolean dataHazard() {
+		boolean check = false;
+		if(deregister.getInstructionType() == InstructionType.typeR) {
+			if(
+				compareRegId(2, emregister) ||
+				compareRegId(2, mwregister) ||
+				compareRegId(3, emregister) ||
+				compareRegId(3, mwregister)			
+			) {
+				check = true;
+			}
+		}else if(deregister.getInstructionType() == InstructionType.typeBranch) {
+			if(
+				compareRegId(1, emregister) ||
+				compareRegId(1, mwregister) ||
+				compareRegId(2, emregister) ||
+				compareRegId(2, mwregister)			
+			) {
+				check = true;
+			}
+		}
+		return check;
+	}
+	
+	private boolean compareRegId(int partIndex, ExecutionMemoryRegister reg) {
+		boolean equalRegIds = false;
+		if(reg.getInstructionIndex() != -1 && fdregister.getParts().length > 3 && fdregister.getParts()[partIndex].length() > 1) {
+			equalRegIds = IM.getIndexOfRegister(fdregister.getParts()[partIndex]) == IM.getIndexOfRegister(reg.getDestRegister().getId());
+		}
+		return equalRegIds;
+	}
+	
+	private boolean compareRegId(int partIndex, MemoryWriteBackRegister reg) {
+		boolean equalRegIds = false;
+		if(reg.getInstructionIndex() != -1 && fdregister.getParts().length > 3 && fdregister.getParts()[partIndex].length() > 1) {
+			equalRegIds = IM.getIndexOfRegister(fdregister.getParts()[partIndex]) == IM.getIndexOfRegister(reg.getDestRegister().getId());
+		}
+		return equalRegIds;
+	}
+	
+	private void branchPrediction(boolean branchTaken, int instructionIndex) {
+		if (branchPredictor == 1 || branchPredictor == 2) {
+			String state = "";
+			BranchTargetBuffer buffer;
+			if (branchPredictor == 1) {
+				state = (branchTaken)? "1" : "0";
+				
+			}else if (branchPredictor == 2) {
+				if (branchBuffer.containsKey(instructionIndex)) {
+					String previousState = branchBuffer.get(instructionIndex).getPredictionState();
+					switch (previousState) {
+					case "00":
+						state = (branchTaken)? "01" : "00";
+						break;
+					case "01":
+						state = (branchTaken)? "10" : "00";
+						break;
+					case "10":
+						state = (branchTaken)? "11" : "01";
+						break;
+					case "11":
+						state = (branchTaken)? "11" : "10";
+						break;
+					}			
+				}else {
+					state = (branchTaken)? "10" : "01";
+				}
+			}
+			
+			if (branchBuffer.containsKey(instructionIndex)) {
+				buffer = branchBuffer.get(instructionIndex);
+				buffer.setPredictionState(state);
+				branchBuffer.replace(instructionIndex, buffer);
+			}else {
+				buffer = new BranchTargetBuffer(state, labels.get(deregister.getDestJump()));
+				branchBuffer.put(instructionIndex, buffer);
+			}
+		}
 	}
 }

@@ -5,6 +5,7 @@ import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
+import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
@@ -19,15 +20,27 @@ import java.util.List;
 import application.interpreter.*;
 
 public class MainController {
+	//Menú:
+	@FXML
+	private RadioMenuItem branchPredictorDisable;
+	@FXML
+	private RadioMenuItem branchPredictor1bit;
+	@FXML
+	private RadioMenuItem branchPredictor2bit;
 	
+	//Editor de código:
 	@FXML
 	private TextArea inputCodeArea;
+	
+	//Tabla de registros:
 	@FXML
     private TableView<Register> registersTable;
 	@FXML
     private TableColumn<Register, String> registersIdCol;
     @FXML
     private TableColumn<Register, Integer> registersValueCol;
+    
+    //Diagrama de ciclos:
     @FXML
     private GridPane grid;
     @FXML
@@ -41,25 +54,57 @@ public class MainController {
     final double BOX_WIDTH = 70;
     final double BOX_HEIGHT = 30;
     final double FIRST_BOX_WIDTH = 140;
+    
+    MIPSInterpreter interpreter;
+    public boolean isFirstCycle = true;
 	
 	public void onExecuteButtonDown(ActionEvent e) {
 		initializeDiagram();
 		
-		MIPSInterpreter interpreter = new MIPSInterpreter(this);
-		interpreter.Run(inputCodeArea.getText());
+		interpreter = new MIPSInterpreter(this);
+		interpreter.instructionsParser(inputCodeArea.getText());
+		interpreter.runCompleteCode();
 		
 		loadRegistersTable(interpreter.getRegisters());
 	}
 	
-	public void loadRegistersTable(List<Register> regs) {
+	public void onNextCycleButtonDown(ActionEvent e) {
+		if(isFirstCycle) {
+			initializeDiagram();
+			interpreter = new MIPSInterpreter(this);
+			interpreter.instructionsParser(inputCodeArea.getText());
+			isFirstCycle = false;
+		}
+		
+		interpreter.runCycle();
+
+        loadRegistersTable(interpreter.getRegisters());
+	}
+	
+	public int getBranchPredictionConfig() {
+		int bp = 0;
+		if(branchPredictorDisable.isSelected()) {
+			bp = 0;
+		}else if(branchPredictor1bit.isSelected()) {
+			bp = 1;
+		}else if(branchPredictor2bit.isSelected()) {
+			bp = 2;
+		}
+		return bp;
+	}
+	
+	//Métodos de la Tabla de Registros
+	public void loadRegistersTable(List<Register> regs) {	
 		ObservableList<Register> regsList = FXCollections.observableArrayList(regs);
 		
 		registersIdCol.setCellValueFactory(new PropertyValueFactory<Register, String>("id"));
 		registersValueCol.setCellValueFactory(new PropertyValueFactory<Register, Integer>("value"));
 		
 		registersTable.setItems(regsList);
+		registersTable.refresh();
 	}
 	
+	//Métodos del Diagrama de Ciclos
 	private void initializeDiagram() {
 		clearDiagram();
         scrollPane.vvalueProperty().bindBidirectional(fixedScrollPane.vvalueProperty());
@@ -79,12 +124,16 @@ public class MainController {
 		addBox(0, nInstruction, instruction, "aliceblue", true);
 	}
 	
-	public void addDiagramColumn(int nCycles, int instructionF, int instructionD, int instructionE, int instructionM, int instructionW) {
+	public void addDiagramColumn(int nCycles, int instructionF, int instructionD, int instructionE, int instructionM, int instructionW, boolean stall) {
 		grid.setMinWidth(BOX_WIDTH * nCycles);
 		grid.setPrefWidth(BOX_WIDTH * nCycles);
 		grid.setMaxWidth(BOX_WIDTH * nCycles);
 		if(instructionF != -1) {
-			addBox(nCycles, instructionF, "IF", "gold", false);
+			if(!stall) {
+				addBox(nCycles, instructionF, "IF", "gold", false);
+			}else {
+				addBox(nCycles, instructionF, "RAW", "gold", false);
+			}
 		}
 		if(instructionD != -1) {
 			addBox(nCycles, instructionD, "ID", "powderblue", false);

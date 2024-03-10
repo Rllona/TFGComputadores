@@ -1,10 +1,15 @@
 package application.interpreter;
 
 import java.util.HashMap;
+import java.util.List;
 
 public class InstructionSetManager{
 	
 	MIPSInterpreter interpreter;
+	List<String> instructionsTypeRList = List.of("add", "sub", "addi");
+	List<String> instructionsTypeMemList = List.of("lw", "sw");
+	List<String> instructionsTypeJumpList = List.of("j");
+	List<String> instructionsTypeBranchList = List.of("beq", "bne");
 	
 	public InstructionSetManager(MIPSInterpreter interpreter){
 		this.interpreter = interpreter;
@@ -29,31 +34,32 @@ public class InstructionSetManager{
 	}
 	
 	public int getIndexOfRegister(String reg) {
-		int index = Character.getNumericValue(reg.charAt(1));
+		int index = Integer.parseInt(reg.substring(1));
 		return index;
 	}
 	
 	public void resetPipelineRegister() {
 		interpreter.fdregister.setInstructionIndex(-1);
+		interpreter.fdregister.setTotalInsIndex(-1);
 	}
 	
 	
 	//Identificación Tipos de Instrucción
 	
 	public boolean isTypeR(String opcode) {
-		return ("add".equals(opcode) || "sub".equals(opcode) || "addi".equals(opcode));
+		return (instructionsTypeRList.contains(opcode));
 	}
 	
 	public boolean isTypeMem(String opcode) {
-		return ("lw".equals(opcode) || "sw".equals(opcode));
+		return (instructionsTypeMemList.contains(opcode));
 	}
 	
 	public boolean isTypeBranch(String opcode) {
-		return ("beq".equals(opcode) || "bne".equals(opcode));
+		return (instructionsTypeBranchList.contains(opcode));
 	}
 	
 	public boolean isTypeJump(String opcode) {
-		return "j".equals(opcode);
+		return (instructionsTypeJumpList.contains(opcode));
 	}
 	
 	
@@ -68,20 +74,64 @@ public class InstructionSetManager{
 	}
 	
 	public void jump(String label) {
-		HashMap<String, Integer> labels = interpreter.getLabels();
-		interpreter.pc = labels.get(label);
-		resetPipelineRegister();
-	}
-	
-	public void beq(int value1, int value2, String label) {
-		if(value1 == value2) {
-			jump(label);
+		if(!interpreter.branchBuffer.containsKey(interpreter.deregister.getInstructionIndex())) {
+			HashMap<String, Integer> labels = interpreter.getLabels();
+			interpreter.pc = labels.get(label);
+			resetPipelineRegister();
+		}else {
+			BranchTargetBuffer buffer = interpreter.branchBuffer.get(interpreter.deregister.getInstructionIndex());
+			if (interpreter.branchPredictor == 1) {
+				if(buffer.getPredictionState().equals("0")) {
+					HashMap<String, Integer> labels = interpreter.getLabels();
+					interpreter.pc = labels.get(label);
+					resetPipelineRegister();
+				}
+			}else if (interpreter.branchPredictor == 2) {
+				if (buffer.getPredictionState().equals("00") || buffer.getPredictionState().equals("01")) {
+					HashMap<String, Integer> labels = interpreter.getLabels();
+					interpreter.pc = labels.get(label);
+					resetPipelineRegister();
+				}
+			}
 		}
 	}
 	
-	public void bne(int value1, int value2, String label) {
+	public boolean beq(int value1, int value2, String label) {
+		boolean branchTaken = false;
+		if(value1 == value2) {
+			jump(label);
+			branchTaken = true;
+		}else {
+			evaluateBranchNotTaken();
+		}
+		return branchTaken;
+	}
+	
+	public boolean bne(int value1, int value2, String label) {
+		boolean branchTaken = false;
 		if(value1 != value2) {
 			jump(label);
+			branchTaken = true;
+		}else {
+			evaluateBranchNotTaken();
+		}
+		return branchTaken;
+	}
+	
+	public void evaluateBranchNotTaken() {
+		if(interpreter.branchBuffer.containsKey(interpreter.deregister.getInstructionIndex())) {
+			BranchTargetBuffer buffer = interpreter.branchBuffer.get(interpreter.deregister.getInstructionIndex());
+			if (interpreter.branchPredictor == 1) {
+				if(buffer.getPredictionState().equals("1")) {
+					interpreter.pc = interpreter.deregister.getInstructionIndex() + 1;
+					resetPipelineRegister();
+				}
+			}else if (interpreter.branchPredictor == 2) {
+				if (buffer.getPredictionState().equals("11") || buffer.getPredictionState().equals("10")) {
+					interpreter.pc = interpreter.deregister.getInstructionIndex() + 1;
+					resetPipelineRegister();
+				}
+			}
 		}
 	}
 }
